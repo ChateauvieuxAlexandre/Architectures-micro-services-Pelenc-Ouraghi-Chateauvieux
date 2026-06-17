@@ -10,7 +10,7 @@
 # Lancer : docker compose up --build   (ou ./demarrer.sh pour ne lancer que le prêt)
 
 x-jwt: &jwt-secret
-  JWT_SECRET: "JeSuisLeSecret"   # le même pour TOUS les services
+  JWT_SECRET: "je-suis-le-secret-tres-secret-12"   # le même pour TOUS les services
 
 services:
   gateway:
