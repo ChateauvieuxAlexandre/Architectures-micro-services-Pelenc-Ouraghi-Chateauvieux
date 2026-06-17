@@ -65,9 +65,8 @@ services:
     build: ./service-moderation
     environment:
       <<: *jwt-secret
-      DB_PATH: /data/moderation.db
     volumes:
-      - moderation-data:/data
+      - moderation-data:/app/data.db
     healthcheck: *python-healthcheck
 
   service-evenements:
