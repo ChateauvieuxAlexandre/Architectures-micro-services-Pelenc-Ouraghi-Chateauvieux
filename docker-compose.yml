@@ -20,9 +20,10 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
 
   service-comptes:
-    build: ./service-comptes
+    build: ./service-comptes/src
+    ports:
+      - 5000:5000
     environment:
-      <<: *jwt-secret
       DB_PATH: /data/comptes.db
     volumes:
       - comptes-data:/data
@@ -37,12 +38,14 @@ services:
       - economie-data:/data
     healthcheck: *python-healthcheck
 
+
+# G4 : Service Boutique
   service-boutique:
     build: ./service-boutique
     environment:
       <<: *jwt-secret
       DB_PATH: /data/boutique.db
-      ECONOMIE_URL: "http://service-economie:5000"
+      ECONOMIE_URL: http://service-economie:5000
     volumes:
       - boutique-data:/data
     healthcheck: *python-healthcheck

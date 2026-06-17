@@ -1,0 +1,6 @@
+flask
+pyjwt
+requests
+sqlalchemy
+werkzeug
+pytest
