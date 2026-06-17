@@ -1,0 +1,4 @@
+flask
+pyjwt
+requests
+psycopg2-binary
