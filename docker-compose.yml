@@ -1,5 +1,5 @@
-# Orchestration de l'écosystème Voxenfer -- À COMPLÉTER par le groupe G1.
-# Auteur : Philippe ROUSSILLE <roussille@3il.fr>
+# Orchestration de l'écosystème Voxenfer -- COMPLÉTÉ par le groupe G1.
+# Auteur : Philippe ROUSSILLE <roussille@3il.fr> (Complété par G1)
 #
 # FOURNIS : la gateway, le Postgres "Luanti" (luanti-db) et le serveur de jeu
 # optionnel. À AJOUTER par G1 : un bloc par service métier (sur le modèle de
@@ -10,7 +10,7 @@
 # Lancer : docker compose up --build   (ou ./demarrer.sh pour ne lancer que le prêt)
 
 x-jwt: &jwt-secret
-  JWT_SECRET: "voxenfer-secret-partage-du-serveur-2026"   # le même pour TOUS les services
+  JWT_SECRET: "JeSuisLeSecret"   # le même pour TOUS les services
 
 services:
   gateway:
@@ -22,19 +22,63 @@ services:
     # Pas de depends_on : Caddy résout chaque service À LA DEMANDE (502 s'il est
     # absent). On peut donc démarrer la plateforme avant que tout existe.
 
-  # --- Modèle (NEUTRE) d'un service métier : à RECOPIER pour chacun -----------
-  # Décommentez et adaptez (nom, DB_PATH, volume) pour chacun de VOS services :
-  #
-  #   service-exemple:
-  #     build: ./service-exemple
-  #     environment:
-  #       <<: *jwt-secret
-  #       DB_PATH: /data/exemple.db
-  #     volumes:
-  #       - exemple-data:/data
-  #
-  # TODO G1 : un bloc par service (comptes, economie, boutique, classements,
-  # moderation, evenements), chacun son DB_PATH et son volume, puis service-monde.
+  # --- Services métiers ajoutés par G1 ----------------------------------------
+
+  # G2 : Service Comptes
+  service-comptes:
+    build: ./service-comptes
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/comptes.db
+    volumes:
+      - comptes-data:/data
+
+  # G3 : Service Économie
+  service-economie:
+    build: ./service-economie
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/economie.db
+    volumes:
+      - economie-data:/data
+
+  # G4 : Service Boutique
+  service-boutique:
+    build: ./service-boutique
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/boutique.db
+    volumes:
+      - boutique-data:/data
+
+  # G5 : Service Classements
+  service-classements:
+    build: ./service-classements
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/classements.db
+    volumes:
+      - classements-data:/data
+
+  # G6 : Service Modération
+  service-moderation:
+    build: ./service-moderation
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/moderation.db
+    volumes:
+      - moderation-data:/data
+
+  # G7 : Service Événements
+  service-evenements:
+    build: ./service-evenements
+    environment:
+      <<: *jwt-secret
+      DB_PATH: /data/evenements.db
+    volumes:
+      - evenements-data:/data
+
+  # --- Service G1 - Lecteur Base Luanti ---------------------------------------
 
   # service-monde : lecteur (seul) de la base Luanti. Pas de SQLite, pas de JWT
   # (lectures ouvertes) : juste la connexion au Postgres "Luanti" ci-dessous.
@@ -87,4 +131,9 @@ services:
 
 volumes:
   luanti-data:
-  # TODO G1 : un volume par service ajouté (comptes-data, economie-data, ...).
+  comptes-data:
+  economie-data:
+  boutique-data:
+  classements-data:
+  moderation-data:
+  evenements-data:
