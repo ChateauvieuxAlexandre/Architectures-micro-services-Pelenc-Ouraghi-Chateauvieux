@@ -1,16 +1,15 @@
-# Orchestration de l'écosystème Voxenfer -- COMPLÉTÉ par le groupe G1.
-# Auteur : Philippe ROUSSILLE <roussille@3il.fr> (Complété par G1)
-#
-# FOURNIS : la gateway, le Postgres "Luanti" (luanti-db) et le serveur de jeu
-# optionnel. À AJOUTER par G1 : un bloc par service métier (sur le modèle de
-# service-comptes ci-dessous, chacun son DB_PATH et son volume) et le service-monde.
-#
-# - un secret JWT COMMUN à tous (sinon les jetons ne sont pas reconnus partout) ;
-# - un volume par service pour garder sa base SQLite entre deux redémarrages.
-# Lancer : docker compose up --build   (ou ./demarrer.sh pour ne lancer que le prêt)
+# Orchestration commune Voxenfer — groupe G1.
+# Seule la gateway publie un port HTTP sur la machine.
 
 x-jwt: &jwt-secret
-  JWT_SECRET: "je-suis-le-secret-tres-secret-12"   # le même pour TOUS les services
+  JWT_SECRET: "je-suis-le-secret-tres-secret-12"
+
+x-python-healthcheck: &python-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=2)"]
+  interval: 10s
+  timeout: 3s
+  retries: 5
+  start_period: 5s
 
 services:
   gateway:
@@ -18,13 +17,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-    # Pas de depends_on : Caddy résout chaque service À LA DEMANDE (502 s'il est
-    # absent). On peut donc démarrer la plateforme avant que tout existe.
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
 
-  # --- Services métiers ajoutés par G1 ----------------------------------------
-
-  # G2 : Service Comptes
   service-comptes:
     build: ./service-comptes
     environment:
@@ -32,8 +26,8 @@ services:
       DB_PATH: /data/comptes.db
     volumes:
       - comptes-data:/data
+    healthcheck: *python-healthcheck
 
-  # G3 : Service Économie
   service-economie:
     build: ./service-economie
     environment:
@@ -41,17 +35,18 @@ services:
       DB_PATH: /data/economie.db
     volumes:
       - economie-data:/data
+    healthcheck: *python-healthcheck
 
-  # G4 : Service Boutique
   service-boutique:
     build: ./service-boutique
     environment:
       <<: *jwt-secret
       DB_PATH: /data/boutique.db
+      ECONOMIE_URL: "http://service-economie:5000"
     volumes:
       - boutique-data:/data
+    healthcheck: *python-healthcheck
 
-  # G5 : Service Classements
   service-classements:
     build: ./service-classements
     environment:
@@ -59,8 +54,8 @@ services:
       DB_PATH: /data/classements.db
     volumes:
       - classements-data:/data
+    healthcheck: *python-healthcheck
 
-  # G6 : Service Modération
   service-moderation:
     build: ./service-moderation
     environment:
@@ -68,8 +63,8 @@ services:
       DB_PATH: /data/moderation.db
     volumes:
       - moderation-data:/data
+    healthcheck: *python-healthcheck
 
-  # G7 : Service Événements
   service-evenements:
     build: ./service-evenements
     environment:
@@ -77,21 +72,18 @@ services:
       DB_PATH: /data/evenements.db
     volumes:
       - evenements-data:/data
+    healthcheck: *python-healthcheck
 
-  # --- Service G1 - Lecteur Base Luanti ---------------------------------------
-
-  # service-monde : lecteur (seul) de la base Luanti. Pas de SQLite, pas de JWT
-  # (lectures ouvertes) : juste la connexion au Postgres "Luanti" ci-dessous.
-  # À coder par G1 (dossier ./service-monde) ; spécifié dans 2-contrats.md.
   service-monde:
     build: ./service-monde
     environment:
-      LUANTI_DSN: "host=luanti-db port=5432 dbname=luanti user=luanti password=luanti"
+      LUANTI_DSN: "host=luanti-db port=5432 dbname=luanti user=monde_reader password=monde_reader"
     depends_on:
       luanti-db:
         condition: service_healthy
+    healthcheck: *python-healthcheck
 
-  # Stand-in du serveur Luanti : un Postgres au vrai schéma du moteur (tables vides).
+  # PostgreSQL reproduit le schéma auth/player du moteur Luanti.
   luanti-db:
     image: postgres:16
     environment:
@@ -107,14 +99,11 @@ services:
       timeout: 3s
       retries: 10
 
-  # --- Serveur de jeu Luanti (OPTIONNEL) : ./jouer.sh (profile "jeu") ----------
-  # Boote auth+player en PostgreSQL sur luanti-db ; le mod (worldmods) appelle vos
-  # services via la gateway. Prérequis : un jeu (jouer.sh clone Minetest Game) et,
-  # pour générer des données, un CLIENT Luanti sur 127.0.0.1:30000 (serveur headless).
+  # Serveur de jeu facultatif : docker compose --profile jeu up --build
   luanti:
     image: ghcr.io/luanti-org/luanti:master
     profiles: ["jeu"]
-    user: "0:0"        # démo : écrire la map dans le dossier de monde (créé root)
+    user: "0:0"
     command: ["--config", "/etc/minetest/minetest.conf", "--world", "/var/lib/minetest/world", "--gameid", "minetest_game"]
     ports:
       - "30000:30000/udp"
@@ -130,10 +119,10 @@ services:
         condition: service_started
 
 volumes:
-  luanti-data:
   comptes-data:
   economie-data:
   boutique-data:
   classements-data:
   moderation-data:
   evenements-data:
+  luanti-data:
