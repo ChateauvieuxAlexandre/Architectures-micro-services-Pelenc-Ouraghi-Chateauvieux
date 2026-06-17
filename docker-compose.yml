@@ -1,0 +1,90 @@
+# Orchestration de l'écosystème Voxenfer -- À COMPLÉTER par le groupe G1.
+# Auteur : Philippe ROUSSILLE <roussille@3il.fr>
+#
+# FOURNIS : la gateway, le Postgres "Luanti" (luanti-db) et le serveur de jeu
+# optionnel. À AJOUTER par G1 : un bloc par service métier (sur le modèle de
+# service-comptes ci-dessous, chacun son DB_PATH et son volume) et le service-monde.
+#
+# - un secret JWT COMMUN à tous (sinon les jetons ne sont pas reconnus partout) ;
+# - un volume par service pour garder sa base SQLite entre deux redémarrages.
+# Lancer : docker compose up --build   (ou ./demarrer.sh pour ne lancer que le prêt)
+
+x-jwt: &jwt-secret
+  JWT_SECRET: "voxenfer-secret-partage-du-serveur-2026"   # le même pour TOUS les services
+
+services:
+  gateway:
+    image: caddy:2
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+    # Pas de depends_on : Caddy résout chaque service À LA DEMANDE (502 s'il est
+    # absent). On peut donc démarrer la plateforme avant que tout existe.
+
+  # --- Modèle (NEUTRE) d'un service métier : à RECOPIER pour chacun -----------
+  # Décommentez et adaptez (nom, DB_PATH, volume) pour chacun de VOS services :
+  #
+  #   service-exemple:
+  #     build: ./service-exemple
+  #     environment:
+  #       <<: *jwt-secret
+  #       DB_PATH: /data/exemple.db
+  #     volumes:
+  #       - exemple-data:/data
+  #
+  # TODO G1 : un bloc par service (comptes, economie, boutique, classements,
+  # moderation, evenements), chacun son DB_PATH et son volume, puis service-monde.
+
+  # service-monde : lecteur (seul) de la base Luanti. Pas de SQLite, pas de JWT
+  # (lectures ouvertes) : juste la connexion au Postgres "Luanti" ci-dessous.
+  # À coder par G1 (dossier ./service-monde) ; spécifié dans 2-contrats.md.
+  service-monde:
+    build: ./service-monde
+    environment:
+      LUANTI_DSN: "host=luanti-db port=5432 dbname=luanti user=luanti password=luanti"
+    depends_on:
+      luanti-db:
+        condition: service_healthy
+
+  # Stand-in du serveur Luanti : un Postgres au vrai schéma du moteur (tables vides).
+  luanti-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: luanti
+      POSTGRES_PASSWORD: luanti
+      POSTGRES_DB: luanti
+    volumes:
+      - ./luanti-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - luanti-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luanti -d luanti"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # --- Serveur de jeu Luanti (OPTIONNEL) : ./jouer.sh (profile "jeu") ----------
+  # Boote auth+player en PostgreSQL sur luanti-db ; le mod (worldmods) appelle vos
+  # services via la gateway. Prérequis : un jeu (jouer.sh clone Minetest Game) et,
+  # pour générer des données, un CLIENT Luanti sur 127.0.0.1:30000 (serveur headless).
+  luanti:
+    image: ghcr.io/luanti-org/luanti:master
+    profiles: ["jeu"]
+    user: "0:0"        # démo : écrire la map dans le dossier de monde (créé root)
+    command: ["--config", "/etc/minetest/minetest.conf", "--world", "/var/lib/minetest/world", "--gameid", "minetest_game"]
+    ports:
+      - "30000:30000/udp"
+    volumes:
+      - ./luanti/minetest.conf:/etc/minetest/minetest.conf:ro
+      - ./luanti/world.mt:/var/lib/minetest/world/world.mt
+      - ./mod-voxenfer:/var/lib/minetest/world/worldmods/voxenfer:ro
+      - ./minetest_game:/usr/local/share/luanti/games/minetest_game:ro
+    depends_on:
+      luanti-db:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+
+volumes:
+  luanti-data:
+  # TODO G1 : un volume par service ajouté (comptes-data, economie-data, ...).
