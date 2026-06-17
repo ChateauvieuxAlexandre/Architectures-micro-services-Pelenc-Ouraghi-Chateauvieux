@@ -1,0 +1,51 @@
+# Gateway unique de l'écosystème Voxenfer.
+# handle_path retire le préfixe public avant de transmettre au service Flask.
+
+:80 {
+	redir /comptes /comptes/ 308
+	redir /economie /economie/ 308
+	redir /boutique /boutique/ 308
+	redir /classements /classements/ 308
+	redir /moderation /moderation/ 308
+	redir /evenements /evenements/ 308
+	redir /monde /monde/ 308
+
+	handle_path /comptes/* {
+		reverse_proxy service-comptes:5000
+	}
+
+	handle_path /economie/* {
+		reverse_proxy service-economie:5000
+	}
+
+	handle_path /boutique/* {
+		reverse_proxy service-boutique:5000
+	}
+
+	handle_path /classements/* {
+		reverse_proxy service-classements:5000
+	}
+
+	handle_path /moderation/* {
+		reverse_proxy service-moderation:5000
+	}
+
+	# /evenements/ devient / dans service-evenements.
+	handle_path /evenements/* {
+		reverse_proxy service-evenements:5000
+	}
+
+	handle_path /monde/* {
+		reverse_proxy service-monde:5000
+	}
+
+	handle / {
+		header Content-Type application/json
+		respond `{"status":"ok","service":"gateway","projet":"Voxenfer"}` 200
+	}
+
+	handle {
+		header Content-Type application/json
+		respond `{"erreur":"route publique inconnue"}` 404
+	}
+}
