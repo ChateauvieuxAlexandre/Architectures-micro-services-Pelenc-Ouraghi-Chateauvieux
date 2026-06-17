@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voxenfer — positions sauvegardées</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color-scheme: dark; }
+    body { margin: 0; background: #111827; color: #f9fafb; }
+    header { padding: 1rem 1.25rem; border-bottom: 1px solid #374151; }
+    h1 { margin: 0 0 .25rem; font-size: 1.25rem; }
+    p { margin: 0; color: #9ca3af; }
+    main { padding: 1rem; }
+    #map { width: 100%; height: 70vh; background: #0b1220; border: 1px solid #374151; border-radius: .75rem; }
+    #status { margin-top: .75rem; color: #9ca3af; }
+    .grid { stroke: #1f2937; stroke-width: 1; }
+    .axis { stroke: #4b5563; stroke-width: 1.5; }
+    .player { fill: #f9fafb; stroke: #111827; stroke-width: 2; }
+    .dead { fill: #ef4444; }
+    .label { fill: #f9fafb; font-size: 12px; paint-order: stroke; stroke: #111827; stroke-width: 3px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Positions sauvegardées des joueurs</h1>
+  <p>Projection X/Z du dernier état écrit par Luanti. Ce n’est pas du temps réel.</p>
+</header>
+<main>
+  <svg id="map" viewBox="0 0 1000 700" role="img" aria-label="Carte des positions"></svg>
+  <div id="status">Chargement…</div>
+</main>
+<script>
+const svg = document.querySelector('#map');
+const statusBox = document.querySelector('#status');
+const NS = 'http://www.w3.org/2000/svg';
+
+function el(name, attrs = {}) {
+  const node = document.createElementNS(NS, name);
+  Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+  return node;
+}
+
+function render(players) {
+  svg.replaceChildren();
+  for (let i = 0; i <= 10; i++) {
+    svg.append(el('line', {x1: i * 100, y1: 0, x2: i * 100, y2: 700, class: 'grid'}));
+  }
+  for (let i = 0; i <= 7; i++) {
+    svg.append(el('line', {x1: 0, y1: i * 100, x2: 1000, y2: i * 100, class: 'grid'}));
+  }
+  if (!players.length) {
+    statusBox.textContent = 'Aucune position sauvegardée.';
+    return;
+  }
+  const xs = players.map(p => Number(p.x));
+  const zs = players.map(p => Number(p.z));
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minZ = Math.min(...zs), maxZ = Math.max(...zs);
+  const spanX = Math.max(maxX - minX, 20);
+  const spanZ = Math.max(maxZ - minZ, 20);
+  const projectX = x => 60 + ((x - minX) / spanX) * 880;
+  const projectY = z => 640 - ((z - minZ) / spanZ) * 580;
+
+  players.forEach(player => {
+    const x = projectX(Number(player.x));
+    const y = projectY(Number(player.z));
+    svg.append(el('circle', {cx: x, cy: y, r: 7, class: player.vivant ? 'player' : 'player dead'}));
+    const label = el('text', {x: x + 11, y: y - 9, class: 'label'});
+    label.textContent = `${player.pseudo} (${player.x}, ${player.y}, ${player.z})`;
+    svg.append(label);
+  });
+  statusBox.textContent = `${players.length} joueur(s) — actualisation automatique toutes les 10 secondes.`;
+}
+
+async function refresh() {
+  try {
+    const response = await fetch('positions', {cache: 'no-store'});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    render(await response.json());
+  } catch (error) {
+    statusBox.textContent = `Impossible de charger les positions : ${error.message}`;
+  }
+}
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
