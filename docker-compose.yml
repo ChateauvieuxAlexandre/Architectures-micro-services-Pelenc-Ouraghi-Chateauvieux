@@ -71,10 +71,11 @@ services:
     build: ./service-evenements
     environment:
       <<: *jwt-secret
-      DB_PATH: /data/evenements.db
+      DB_PATH: /data/data.db
     volumes:
       - evenements-data:/data
     healthcheck: *python-healthcheck
+
 
   service-monde:
     build: ./service-monde
